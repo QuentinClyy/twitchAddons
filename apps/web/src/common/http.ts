@@ -8,8 +8,8 @@ export class HttpError extends Error {
   }
 }
 
-export async function getJson<T>(url: string): Promise<T> {
-  const response = await fetch(url);
+export async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(url, init);
   if (!response.ok) {
     throw new HttpError(response.status, `Request to ${url} failed with status ${response.status}`);
   }

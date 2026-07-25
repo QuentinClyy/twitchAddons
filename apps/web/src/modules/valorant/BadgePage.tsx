@@ -11,18 +11,19 @@ type Status =
   | { state: 'ready'; rank: RankResponse };
 
 export function BadgePage() {
-  const riotId = getQueryParam('player');
+  const name = getQueryParam('name');
+  const tag = getQueryParam('tag');
   const [status, setStatus] = useState<Status>({ state: 'loading' });
 
   useEffect(() => {
-    if (!riotId) {
-      setStatus({ state: 'error', message: 'Missing ?player=Name#Tag query param' });
+    if (!name || !tag) {
+      setStatus({ state: 'error', message: 'Missing ?name= and ?tag= query params' });
       return;
     }
 
     let cancelled = false;
 
-    fetchPlayerRank(riotId)
+    fetchPlayerRank(name, tag)
       .then((rank) => {
         if (!cancelled) setStatus({ state: 'ready', rank });
       })
@@ -35,7 +36,7 @@ export function BadgePage() {
     return () => {
       cancelled = true;
     };
-  }, [riotId]);
+  }, [name, tag]);
 
   if (status.state === 'loading') {
     return <p>Loading…</p>;

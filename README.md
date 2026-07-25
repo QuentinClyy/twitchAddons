@@ -9,27 +9,27 @@ client-side router.
 ```
 apps/
   web/   Vite + React + TS frontend, deployed to GitHub Pages
-  api/   Small Express + TS API (deployed separately, e.g. on a homelab) that does the actual
-         scraping/lookups the static frontend can't do itself
 ```
 
 ## Addons
 
-- **Valorant rank badge** — `/valorant/badge?player=Name%23Tag` displays a rank-tier badge
-  image for the given Riot ID, fetched from `apps/api`'s `/valorant/rank` endpoint.
+- **Valorant rank badge** — `/valorant/badge?name=Name&tag=Tag` displays a rank-tier badge
+  image for the given Riot ID, looked up directly from HenrikDev's Valorant API (which allows
+  cross-origin browser requests, unlike tracker.gg — no backend needed).
 
 ## Development
 
 ```bash
 npm install
 
-# frontend
 npm run dev -w apps/web
-
-# api
-npm run dev -w apps/api
 
 # lint / format (repo-wide)
 npm run lint
 npm run format
 ```
+
+HenrikDev's API requires a key on every request (their docs say otherwise, but a keyless request
+returns `401`). Get a free one from their Discord (linked at docs.henrikdev.xyz) and set it in
+`apps/web/.env` locally (see `.env.example`), and as the `HENRIK_API_KEY` GitHub Actions secret
+for the Pages build.
