@@ -1,4 +1,7 @@
-import * as THREE from 'three';
+import './chatWidget.css';
+
+const TYPE_SPEED = 14;
+const MAX_ROWS = 40;
 
 const VERDIGRIS_HUE_MIN = 150;
 const VERDIGRIS_HUE_MAX = 185;
@@ -6,7 +9,6 @@ const MIN_LIGHTNESS = 48;
 const MAX_LIGHTNESS = 78;
 const MIN_SATURATION = 30;
 const MAX_SATURATION = 90;
-const FALLBACK_COLOR = '#d9b877';
 
 function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, n));
@@ -53,9 +55,9 @@ function rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: n
   return { h, s: s * 100, l: l * 100 };
 }
 
-function verdigrisVariant(color: string): string {
-  const rgb = parseColorToRgb(color);
-  if (!rgb) return FALLBACK_COLOR;
+function toVerdigrisVariant(originalColor: string): string | null {
+  const rgb = parseColorToRgb(originalColor);
+  if (!rgb) return null;
   const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
   const hue = VERDIGRIS_HUE_MIN + (hsl.h / 360) * (VERDIGRIS_HUE_MAX - VERDIGRIS_HUE_MIN);
   const sat = clamp(hsl.s, MIN_SATURATION, MAX_SATURATION);
@@ -63,166 +65,95 @@ function verdigrisVariant(color: string): string {
   return `hsl(${Math.round(hue)}, ${Math.round(sat)}%, ${Math.round(light)}%)`;
 }
 
-function roundRect(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  r: number,
-) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r);
-  ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r);
-  ctx.arcTo(x, y, x + w, y, r);
-  ctx.closePath();
+function colorizeName(row: HTMLElement) {
+  const nameEl = row.querySelector<HTMLElement>('.name');
+  if (!nameEl) return;
+  const original = nameEl.style.color || getComputedStyle(nameEl).color;
+  const shade = toVerdigrisVariant(original);
+  if (!shade) return;
+  nameEl.style.color = shade;
+  nameEl.style.textShadow = `0 0 6px ${shade}, 0 0 1px rgba(6,15,17,0.8)`;
 }
 
-interface ChatRow {
-  id: string;
-  user: string;
-  text: string;
-  color: string;
-  deleted: boolean;
+function typeWriter(el: HTMLElement) {
+  const full = el.textContent ?? '';
+  el.textContent = '';
+  el.classList.add('typing');
+  let i = 0;
+  function step() {
+    if (i < full.length) {
+      el.textContent += full.charAt(i);
+      i++;
+      setTimeout(step, TYPE_SPEED);
+    } else {
+      el.classList.remove('typing');
+    }
+  }
+  step();
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 export class ChatPanel {
-  readonly canvas: HTMLCanvasElement;
-  readonly texture: THREE.CanvasTexture;
-
-  private readonly ctx: CanvasRenderingContext2D;
-  private rows: ChatRow[] = [];
+  readonly element: HTMLDivElement;
+  private readonly log: HTMLDivElement;
+  private readonly badgeCache = new Set<string>();
 
   constructor() {
-    this.canvas = document.createElement('canvas');
-    this.canvas.width = 1200;
-    this.canvas.height = 860;
-    const ctx = this.canvas.getContext('2d');
-    if (!ctx) throw new Error('2D canvas context not available');
-    this.ctx = ctx;
-    this.texture = new THREE.CanvasTexture(this.canvas);
-    this.texture.colorSpace = THREE.SRGBColorSpace;
-    this.texture.minFilter = THREE.LinearFilter;
-    this.texture.generateMipmaps = false;
-    this.draw();
+    this.element = document.createElement('div');
+    this.element.className = 'chat-widget-root';
+    this.log = document.createElement('div');
+    this.log.id = 'log';
+    this.element.appendChild(this.log);
   }
 
-  addMessage(id: string, user: string, text: string, color: string) {
-    this.rows.push({ id, user, text, color, deleted: false });
-    if (this.rows.length > 40) this.rows.shift();
-    this.draw();
+  /** `html` must already be safe to insert (escaped text + trusted emote `<img>` tags), see twitchChat.ts's renderMessageHtml. */
+  addMessage(id: string, user: string, html: string, color: string, badges: string[] = []) {
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.dataset.from = user;
+    row.dataset.id = id;
+
+    const badgesHtml = badges.map((url) => `<img src="${url}" alt="" />`).join('');
+
+    row.innerHTML = `
+      <span class="meta">
+        <span class="prompt">&gt;</span>
+        <span class="badges">${badgesHtml}</span>
+        <span class="name" style="color:${color}">${escapeHtml(user)}</span><span class="colon">:</span>
+      </span>
+      <span class="message">${html}</span>
+    `;
+
+    this.log.appendChild(row);
+    colorizeName(row);
+    const msg = row.querySelector<HTMLElement>('.message');
+    if (msg) typeWriter(msg);
+
+    while (this.log.children.length > MAX_ROWS) {
+      this.log.removeChild(this.log.firstElementChild as Node);
+    }
+
+    for (const url of badges) this.badgeCache.add(url);
   }
 
   deleteMessage(id: string) {
-    const row = this.rows.find((r) => r.id === id);
-    if (!row) return;
-    row.deleted = true;
-    this.draw();
+    const row = this.log.querySelector<HTMLElement>(`[data-id="${CSS.escape(id)}"]`);
+    row?.classList.add('deleted');
   }
 
   clearUser(user: string) {
-    let changed = false;
-    for (const row of this.rows) {
-      if (row.user === user) {
-        row.deleted = true;
-        changed = true;
-      }
-    }
-    if (changed) this.draw();
+    const rows = this.log.querySelectorAll<HTMLElement>(`[data-from="${CSS.escape(user)}"]`);
+    rows.forEach((row) => row.classList.add('deleted'));
   }
 
   clearAll() {
-    this.rows = [];
-    this.draw();
-  }
-
-  private wrapText(text: string, maxWidth: number): string[] {
-    const words = text.split(' ');
-    const lines: string[] = [];
-    let current = '';
-    for (const word of words) {
-      const test = current ? `${current} ${word}` : word;
-      if (this.ctx.measureText(test).width > maxWidth && current) {
-        lines.push(current);
-        current = word;
-      } else {
-        current = test;
-      }
-    }
-    if (current) lines.push(current);
-    return lines;
-  }
-
-  draw() {
-    const { ctx } = this;
-    const w = this.canvas.width;
-    const h = this.canvas.height;
-
-    ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = '#070f0b';
-    ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = '#123322';
-    ctx.fillRect(0, 0, w, 64);
-    ctx.fillStyle = '#9dffce';
-    ctx.font = '700 30px "Courier New", monospace';
-    ctx.fillText('# chat', 22, 42);
-    ctx.fillStyle = '#4dff9e';
-    ctx.beginPath();
-    ctx.arc(w - 40, 32, 8, 0, Math.PI * 2);
-    ctx.fill();
-
-    const pad = 20;
-    const maxBubbleWidth = w - pad * 2 - 40;
-    ctx.font = '22px "Courier New", monospace';
-
-    const recent = this.rows.slice(-14);
-    const built = recent.map((row) => {
-      ctx.font = '22px "Courier New", monospace';
-      const lines = this.wrapText(row.text, maxBubbleWidth - 20);
-      const height = 34 + lines.length * 30 + 16;
-      return { row, lines, height, top: 0 };
-    });
-
-    let y = h - 14;
-    const positioned: typeof built = [];
-    for (let i = built.length - 1; i >= 0 && y > 74; i--) {
-      const bubble = built[i];
-      y -= bubble.height;
-      positioned.unshift({ ...bubble, top: y });
-      y -= 12;
-    }
-
-    for (const bubble of positioned) {
-      ctx.globalAlpha = bubble.row.deleted ? 0.35 : 1;
-      ctx.fillStyle = 'rgba(255,255,255,0.055)';
-      roundRect(ctx, pad, bubble.top, w - pad * 2, bubble.height, 14);
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(140,255,190,0.14)';
-      ctx.lineWidth = 1.5;
-      roundRect(ctx, pad, bubble.top, w - pad * 2, bubble.height, 14);
-      ctx.stroke();
-
-      ctx.font = '700 22px "Courier New", monospace';
-      ctx.fillStyle = verdigrisVariant(bubble.row.color);
-      ctx.fillText(bubble.row.user, pad + 18, bubble.top + 30);
-
-      ctx.font = '22px "Courier New", monospace';
-      ctx.fillStyle = '#f0fff6';
-      let lineY = bubble.top + 30 + 30;
-      for (const line of bubble.lines) {
-        ctx.fillText(line, pad + 18, lineY);
-        lineY += 30;
-      }
-      ctx.globalAlpha = 1;
-    }
-
-    ctx.globalAlpha = 0.04;
-    ctx.fillStyle = '#000000';
-    for (let sy = 0; sy < h; sy += 4) ctx.fillRect(0, sy, w, 1.5);
-    ctx.globalAlpha = 1;
-
-    this.texture.needsUpdate = true;
+    this.log.innerHTML = '';
   }
 }

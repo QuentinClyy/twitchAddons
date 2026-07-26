@@ -4,13 +4,13 @@ import { createScene, type SceneHandle } from './createScene';
 export function HomePage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<SceneHandle | null>(null);
-  const [isNight, setIsNight] = useState(false);
+  const [isNight, setIsNight] = useState(true);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const handle = createScene(container);
+    const handle = createScene(container, true);
     handleRef.current = handle;
 
     return () => {

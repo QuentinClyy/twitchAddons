@@ -1,0 +1,216 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+.chat-widget-root {
+  --base: #0a171a;
+  --mantle: #081417;
+  --crust: #060f11;
+  --surface0: #132329;
+  --surface1: #172b31;
+  --surface2: #1f3a40;
+  --overlay0: #3c5b56;
+  --overlay1: #46615c;
+  --overlay2: #5c7d76;
+  --select: #466366;
+  --subtext0: #7d9490;
+  --subtext1: #9fc9bd;
+  --text: #9fc9bd;
+  --blue: #5da9d9;
+  --sky: #63b3e0;
+  --green: #4fd8b0;
+  --teal: #6fc9bf;
+  --sand: #d9b877;
+  --lavender: #8fa8d9;
+  --peach: #e0985c;
+  --coral: #e08f83;
+  --purple: #9a93d9;
+  --mauve: #6f63b3;
+  --pink: #c97fa0;
+  --red: #e0667a;
+  --yellow: #e0b563;
+  --border: #24413c;
+  --border-active: #4fd8b0;
+
+  position: relative;
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text);
+}
+
+.chat-widget-root *,
+.chat-widget-root *::before,
+.chat-widget-root *::after {
+  box-sizing: border-box;
+}
+
+.chat-widget-root::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(159, 201, 189, 0.05) 0px,
+    rgba(159, 201, 189, 0.05) 1px,
+    transparent 2px,
+    transparent 4px
+  );
+  animation: chat-widget-flicker 6s infinite;
+}
+
+@keyframes chat-widget-flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  92% {
+    opacity: 1;
+  }
+  93% {
+    opacity: 0.85;
+  }
+  94% {
+    opacity: 1;
+  }
+  97% {
+    opacity: 0.9;
+  }
+  98% {
+    opacity: 1;
+  }
+}
+
+.chat-widget-root #log {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  width: 100%;
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.chat-widget-root .row {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  padding: 8px 12px 8px 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border-active);
+  border-radius: 3px;
+  background: linear-gradient(135deg, rgba(23, 43, 49, 0.55), rgba(19, 35, 41, 0.35));
+  backdrop-filter: blur(8px) saturate(140%);
+  -webkit-backdrop-filter: blur(8px) saturate(140%);
+  box-shadow:
+    inset 0 1px 0 rgba(159, 201, 189, 0.06),
+    0 4px 14px rgba(6, 15, 17, 0.35);
+  animation: chat-widget-row-in 0.25s ease-out;
+  font-size: 30px;
+  line-height: 1.35;
+}
+
+@keyframes chat-widget-row-in {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.chat-widget-root .meta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.chat-widget-root .prompt {
+  color: var(--green);
+  font-weight: 700;
+  text-shadow: 0 0 6px rgba(79, 216, 176, 0.6);
+}
+
+.chat-widget-root .badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.chat-widget-root .badges img {
+  height: 20px;
+  vertical-align: middle;
+  filter: grayscale(1) brightness(1.15) sepia(0.4) hue-rotate(130deg) saturate(280%)
+    drop-shadow(0 0 3px rgba(79, 216, 176, 0.35));
+  opacity: 0.9;
+}
+
+.chat-widget-root .name {
+  font-weight: 700;
+  color: var(--teal);
+  text-shadow:
+    0 0 6px currentColor,
+    0 0 1px rgba(6, 15, 17, 0.8);
+  letter-spacing: 0.2px;
+}
+
+.chat-widget-root .colon {
+  color: var(--subtext0);
+  margin-right: 2px;
+}
+
+.chat-widget-root .message {
+  color: var(--subtext1);
+  word-break: break-word;
+  text-shadow: 0 0 1px rgba(6, 15, 17, 0.6);
+}
+
+.chat-widget-root .message img {
+  height: 1.4em;
+  vertical-align: middle;
+  margin: 0 1px;
+}
+
+.chat-widget-root .typing::after {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 1em;
+  margin-left: 2px;
+  background: var(--green);
+  vertical-align: text-bottom;
+  animation: chat-widget-blink 0.9s steps(1) infinite;
+  box-shadow: 0 0 6px rgba(79, 216, 176, 0.7);
+}
+
+@keyframes chat-widget-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.chat-widget-root .row.deleted {
+  opacity: 0.35;
+  filter: grayscale(0.6);
+}
+
+.chat-widget-root .name[style='color:'],
+.chat-widget-root .name:not([style]) {
+  color: var(--sand);
+}

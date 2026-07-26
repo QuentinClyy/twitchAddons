@@ -1,9 +1,12 @@
+import { resolveBadges } from './twitchBadges';
+
 export interface TwitchChatMessage {
   id: string;
   from: string;
   color: string;
   messageText: string;
   messageHtml: string;
+  badges: string[];
 }
 
 export interface TwitchChatListener {
@@ -87,12 +90,15 @@ export function connectTwitchChat(channel: string, listener: TwitchChatListener)
     const privmsg = rest.match(PRIVMSG_RE);
     if (privmsg) {
       const [, fallbackNick, text] = privmsg;
-      listener.onMessage({
-        id: tags.id || `${Date.now()}-${Math.random()}`,
-        from: tags['display-name'] || fallbackNick,
-        color: tags.color || '',
-        messageText: text,
-        messageHtml: renderMessageHtml(text, tags.emotes),
+      resolveBadges(tags.badges, tags['room-id']).then((badges) => {
+        listener.onMessage({
+          id: tags.id || `${Date.now()}-${Math.random()}`,
+          from: tags['display-name'] || fallbackNick,
+          color: tags.color || '',
+          messageText: text,
+          messageHtml: renderMessageHtml(text, tags.emotes),
+          badges,
+        });
       });
       return;
     }
