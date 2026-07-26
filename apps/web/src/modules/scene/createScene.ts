@@ -1,17 +1,22 @@
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { config } from '../../config/env';
 import { ChatPanel } from './chatPanel';
+import { connectTwitchChat, type TwitchChatHandle } from './twitchChat';
 
 export interface SceneHandle {
   setMode(isNight: boolean): void;
-  addMessage(user: string, text: string): void;
-  setDraft(text: string): void;
   dispose(): void;
 }
+
+const MODEL_SCALE = 1;
+const MODEL_OFFSET = new THREE.Vector3(0, 0.97904, 0);
+const SCREEN_NODE_NAME = 'screen';
 
 function makeGroundTexture(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
@@ -117,8 +122,6 @@ interface LightingState {
   screenColor: THREE.Color;
   lampIntensity: number;
   rimIntensity: number;
-  emissive: number;
-  bloomStrength: number;
   background: THREE.Color;
   fogColor: THREE.Color;
   fogDensity: number;
@@ -140,8 +143,6 @@ const DAY_STATE: LightingState = {
   screenColor: new THREE.Color('#5cff9c'),
   lampIntensity: 0.1,
   rimIntensity: 0.25,
-  emissive: 0.55,
-  bloomStrength: 0.14,
   background: new THREE.Color('#42533f'),
   fogColor: new THREE.Color('#4d5f47'),
   fogDensity: 0.011,
@@ -163,8 +164,6 @@ const NIGHT_STATE: LightingState = {
   screenColor: new THREE.Color('#4dffa8'),
   lampIntensity: 0.3,
   rimIntensity: 0.08,
-  emissive: 1.9,
-  bloomStrength: 1.1,
   background: new THREE.Color('#020402'),
   fogColor: new THREE.Color('#040805'),
   fogDensity: 0.038,
@@ -186,11 +185,6 @@ function cloneState(state: LightingState): LightingState {
   };
 }
 
-/**
- * Builds the mossy curved-monitor hero scene inside `container` and starts its render loop.
- * Ported from the design handoff prototype (`scene.js`) — see the handoff README for the
- * rationale behind the specific numeric values (camera/curvature/lighting tables) used below.
- */
 export function createScene(container: HTMLElement): SceneHandle {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#0a1410');
@@ -220,24 +214,14 @@ export function createScene(container: HTMLElement): SceneHandle {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   container.appendChild(renderer.domElement);
 
-  // realistic environment reflections (soft studio/room lighting probe)
   const pmrem = new THREE.PMREMGenerator(renderer);
   const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   scene.environment = envTex;
 
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(
-    new THREE.Vector2(container.clientWidth, container.clientHeight),
-    1.1,
-    0.75,
-    0.55,
-  );
-  bloom.strength = 0.2;
-  composer.addPass(bloom);
   composer.addPass(new OutputPass());
 
-  // ---- lights ----
   const hemi = new THREE.HemisphereLight('#bcd8ff', '#1c2a1a', 0.7);
   scene.add(hemi);
   const sun = new THREE.DirectionalLight('#fff2d6', 1.15);
@@ -259,16 +243,13 @@ export function createScene(container: HTMLElement): SceneHandle {
   const screenLightWide = new THREE.PointLight('#5cff9c', 0.35, 9, 1.6);
   screenLightWide.position.set(0, 1.35, 2.2);
   scene.add(screenLightWide);
-  // warm practical (desk lamp glow) — dim, always present, more felt at night
   const lamp = new THREE.PointLight('#ffb168', 0.25, 5, 2);
   lamp.position.set(-2.1, 1.6, 1.4);
   scene.add(lamp);
-  // soft rim/back light for silhouette separation from foliage
   const rim = new THREE.DirectionalLight('#8fd8c8', 0.3);
   rim.position.set(2, 3, -6);
   scene.add(rim);
 
-  // ---- ground ----
   const groundTex = makeGroundTexture();
   const groundBump = makeGroundBump();
   const ground = new THREE.Mesh(
@@ -285,7 +266,6 @@ export function createScene(container: HTMLElement): SceneHandle {
   ground.receiveShadow = true;
   scene.add(ground);
 
-  // soft contact shadow blob under monitor for grounding
   const contactCanvas = document.createElement('canvas');
   contactCanvas.width = contactCanvas.height = 256;
   const contactCtx = contactCanvas.getContext('2d')!;
@@ -303,7 +283,6 @@ export function createScene(container: HTMLElement): SceneHandle {
   contactShadow.position.set(0, 0.011, 0.7);
   scene.add(contactShadow);
 
-  // ferns scattered
   const fernTex = makeFernTexture();
   const fernMat = new THREE.MeshBasicMaterial({
     map: fernTex,
@@ -328,7 +307,6 @@ export function createScene(container: HTMLElement): SceneHandle {
     scene.add(fern2);
   }
 
-  // tree trunks in background
   const trunkMat = new THREE.MeshStandardMaterial({ color: '#241a12', roughness: 0.95 });
   for (let i = 0; i < 10; i++) {
     const a = (i / 10) * Math.PI * 2 + Math.random() * 0.3;
@@ -342,7 +320,6 @@ export function createScene(container: HTMLElement): SceneHandle {
     scene.add(trunk);
   }
 
-  // god rays (day only)
   const rayCanvas = document.createElement('canvas');
   rayCanvas.width = 64;
   rayCanvas.height = 256;
@@ -370,142 +347,128 @@ export function createScene(container: HTMLElement): SceneHandle {
     rays.push(ray);
   }
 
-  // ---- monitor group ----
   const monitor = new THREE.Group();
   monitor.position.set(0, 0, 0.4);
   scene.add(monitor);
 
-  const plasticMat = new THREE.MeshStandardMaterial({
-    color: '#d7d3c4',
-    roughness: 0.6,
-    metalness: 0.08,
-    envMapIntensity: 0.6,
-  });
-  const plasticDarkMat = new THREE.MeshStandardMaterial({
-    color: '#8b8878',
-    roughness: 0.7,
-    envMapIntensity: 0.5,
-  });
-
-  const backBox = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.7, 1.5), plasticMat);
-  backBox.position.set(0, 1.35, -0.55);
-  backBox.scale.set(0.82, 0.9, 1);
-  backBox.castShadow = true;
-  backBox.receiveShadow = true;
-  monitor.add(backBox);
-
-  const bezel = new THREE.Mesh(new THREE.BoxGeometry(2.05, 1.85, 0.3), plasticMat);
-  bezel.position.set(0, 1.35, 0.15);
-  bezel.castShadow = true;
-  bezel.receiveShadow = true;
-  monitor.add(bezel);
-
-  for (let i = 0; i < 6; i++) {
-    const vent = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.03, 0.9), plasticDarkMat);
-    vent.position.set(0.75, 1.9 - i * 0.06, -0.5);
-    monitor.add(vent);
-  }
-
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 0.35, 12), plasticDarkMat);
-  neck.position.set(0, 0.42, -0.1);
-  monitor.add(neck);
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.6, 0.14, 20), plasticDarkMat);
-  base.position.set(0, 0.28, -0.1);
-  base.castShadow = true;
-  base.receiveShadow = true;
-  monitor.add(base);
-
-  // curved screen (emissive UI) — arc centered on local +Z at radius R, so the visible
-  // center point sits exactly at the bezel's front face after offsetting position.z by -R
-  const chat = new ChatPanel();
-  chat.texture.minFilter = THREE.LinearFilter;
-  chat.texture.generateMipmaps = false;
-  chat.texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-  const R = 4.2;
-  const arcHalf = 0.25;
-  const screenGeo = new THREE.CylinderGeometry(R, R, 1.5, 48, 1, true, -arcHalf, arcHalf * 2);
-  const screenMat = new THREE.MeshStandardMaterial({
-    map: chat.texture,
-    emissive: new THREE.Color('#3dffa0'),
-    emissiveMap: chat.texture,
-    emissiveIntensity: 0.55,
-    roughness: 0.55,
-    metalness: 0.0,
-    side: THREE.DoubleSide,
-    envMapIntensity: 0.12,
-  });
-  const screen = new THREE.Mesh(screenGeo, screenMat);
-  screen.position.set(0, 1.35, 0.35 - R);
-  monitor.add(screen);
-
-  // thin glass layer over the screen for glare/reflection realism
-  const Rg = R - 0.015;
-  const glassGeo = new THREE.CylinderGeometry(Rg, Rg, 1.46, 48, 1, true, -arcHalf, arcHalf * 2);
-  const glassMat = new THREE.MeshPhysicalMaterial({
-    color: '#0a1410',
-    transparent: true,
-    opacity: 0.045,
-    roughness: 0.2,
-    metalness: 0,
-    clearcoat: 0.15,
-    clearcoatRoughness: 0.35,
-    envMapIntensity: 0.4,
-    side: THREE.FrontSide,
-  });
-  const glass = new THREE.Mesh(glassGeo, glassMat);
-  glass.position.set(0, 1.35, 0.365 - Rg);
-  monitor.add(glass);
-
-  // moss clumps
-  const mossMat = new THREE.MeshStandardMaterial({
-    color: '#3d6b2c',
-    roughness: 0.9,
-    envMapIntensity: 0.3,
-  });
   const mossGeo = new THREE.IcosahedronGeometry(0.09, 0);
-  const mossSpots: Array<[number, number, number, number]> = [
-    [-0.8, 2.25, -0.3, 14],
-    [0.7, 2.28, -0.6, 12],
-    [0.9, 1.95, 0.28, 6],
-    [-0.95, 1.5, 0.25, 5],
-    [0, 2.3, -0.9, 10],
-  ];
-  for (const [x, y, z, count] of mossSpots) {
-    for (let i = 0; i < count; i++) {
-      const clump = new THREE.Mesh(mossGeo, mossMat);
-      clump.position.set(
-        x + (Math.random() - 0.5) * 0.35,
-        y + (Math.random() - 0.5) * 0.12,
-        z + (Math.random() - 0.5) * 0.35,
+  const mossMats = ['#3d6b2c', '#4a7a35', '#345f27', '#527f3d'].map(
+    (color) => new THREE.MeshStandardMaterial({ color, roughness: 0.95, envMapIntensity: 0.25 }),
+  );
+  const MOSS_UP = new THREE.Vector3(0, 1, 0);
+
+  function createMossClump(): THREE.Group {
+    const clump = new THREE.Group();
+    const blobCount = 2 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < blobCount; i++) {
+      const blob = new THREE.Mesh(mossGeo, mossMats[Math.floor(Math.random() * mossMats.length)]);
+      blob.position.set(
+        (Math.random() - 0.5) * 0.09,
+        Math.random() * 0.03,
+        (Math.random() - 0.5) * 0.09,
       );
-      clump.scale.setScalar(0.6 + Math.random() * 0.9);
-      clump.castShadow = true;
-      monitor.add(clump);
+      blob.scale.set(
+        0.5 + Math.random() * 0.6,
+        0.35 + Math.random() * 0.45,
+        0.5 + Math.random() * 0.6,
+      );
+      blob.rotation.y = Math.random() * Math.PI * 2;
+      blob.castShadow = true;
+      clump.add(blob);
+    }
+    return clump;
+  }
+
+  function scatterMoss(target: THREE.Object3D, parent: THREE.Group, count: number) {
+    target.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(target);
+    const keyboardZStart = box.min.z + (box.max.z - box.min.z) * 0.6;
+    const keyboardYEnd = box.min.y + (box.max.y - box.min.y) * 0.35;
+    const raycaster = new THREE.Raycaster();
+    let placed = 0;
+    let attempts = 0;
+    while (placed < count && attempts < count * 15) {
+      attempts++;
+      const x = THREE.MathUtils.randFloat(box.min.x, box.max.x);
+      const z = THREE.MathUtils.randFloat(box.min.z, box.max.z);
+      raycaster.set(new THREE.Vector3(x, box.max.y + 0.5, z), new THREE.Vector3(0, -1, 0));
+      const hits = raycaster.intersectObject(target, true);
+      if (hits.length === 0) continue;
+      const hit = hits[0];
+      if (!hit.face) continue;
+      const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize();
+      if (normal.y < 0.4) continue;
+      const overKeyboard = hit.point.z > keyboardZStart && hit.point.y < keyboardYEnd;
+      if (overKeyboard && Math.random() > 0.2) continue;
+      const clump = createMossClump();
+      clump.position.copy(hit.point).addScaledVector(normal, 0.004);
+      clump.quaternion.setFromUnitVectors(MOSS_UP, normal);
+      clump.scale.setScalar(0.55 + Math.random() * 1.1);
+      parent.add(clump);
+      placed++;
     }
   }
 
-  // keyboard
-  const keyboard = new THREE.Group();
-  keyboard.position.set(0, 0.02, 2.3);
-  const keyboardBase = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.12, 0.9), plasticMat);
-  keyboardBase.castShadow = true;
-  keyboardBase.receiveShadow = true;
-  keyboard.add(keyboardBase);
-  for (let r = 0; r < 4; r++) {
-    for (let c = 0; c < 13; c++) {
-      const key = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.05, 0.13), plasticMat);
-      key.position.set(-0.95 + c * 0.155, 0.09, -0.32 + r * 0.18);
-      key.castShadow = true;
-      keyboard.add(key);
+  function remapUvToLocalXY(mesh: THREE.Mesh) {
+    const geometry = mesh.geometry;
+    geometry.computeBoundingBox();
+    const bbox = geometry.boundingBox!;
+    const width = bbox.max.x - bbox.min.x;
+    const height = bbox.max.y - bbox.min.y;
+    const position = geometry.getAttribute('position');
+    const uv = new Float32Array(position.count * 2);
+    for (let i = 0; i < position.count; i++) {
+      uv[i * 2] = (position.getX(i) - bbox.min.x) / width;
+      uv[i * 2 + 1] = (position.getY(i) - bbox.min.y) / height;
     }
+    geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   }
-  for (let i = 0; i < 8; i++) {
-    const clump = new THREE.Mesh(mossGeo, mossMat);
-    clump.position.set(-0.9 + Math.random() * 1.8, 0.1, 0.42 + Math.random() * 0.05);
-    clump.scale.setScalar(0.5 + Math.random() * 0.7);
-    keyboard.add(clump);
+
+  const chat = new ChatPanel();
+
+  let twitchChat: TwitchChatHandle | null = null;
+  if (config.twitchChannel) {
+    twitchChat = connectTwitchChat(config.twitchChannel, {
+      onMessage: (message) =>
+        chat.addMessage(message.id, message.from, message.messageText, message.color),
+      onDeleteMessage: (messageId) => chat.deleteMessage(messageId),
+      onClearUser: (username) => chat.clearUser(username),
+      onClearAll: () => chat.clearAll(),
+    });
   }
-  monitor.add(keyboard);
+
+  const draco = new DRACOLoader();
+  draco.setDecoderPath(`${import.meta.env.BASE_URL}draco/`);
+  const gltfLoader = new GLTFLoader();
+  gltfLoader.setDRACOLoader(draco);
+  let disposed = false;
+  gltfLoader.load(`${import.meta.env.BASE_URL}models/cassette-system.glb`, (gltf) => {
+    if (disposed) return;
+    gltf.scene.position.copy(MODEL_OFFSET);
+    gltf.scene.scale.setScalar(MODEL_SCALE);
+    gltf.scene.traverse((obj) => {
+      if ((obj as THREE.Mesh).isMesh) {
+        obj.castShadow = true;
+        obj.receiveShadow = true;
+      }
+    });
+
+    const screenMesh = gltf.scene.getObjectByName(SCREEN_NODE_NAME) as THREE.Mesh | undefined;
+    if (screenMesh) {
+      remapUvToLocalXY(screenMesh);
+      screenMesh.material = new THREE.MeshBasicMaterial({
+        map: chat.texture,
+        side: THREE.DoubleSide,
+        depthTest: false,
+      });
+      screenMesh.renderOrder = 10;
+      screenMesh.castShadow = false;
+      screenMesh.receiveShadow = false;
+    }
+
+    scatterMoss(gltf.scene, monitor, 55);
+    monitor.add(gltf.scene);
+  });
 
   function onResize() {
     const w = container.clientWidth;
@@ -517,7 +480,6 @@ export function createScene(container: HTMLElement): SceneHandle {
   }
   window.addEventListener('resize', onResize);
 
-  // day/night state
   let target = DAY_STATE;
   const current = cloneState(DAY_STATE);
 
@@ -547,8 +509,6 @@ export function createScene(container: HTMLElement): SceneHandle {
     current.screenColor.lerp(target.screenColor, alpha);
     current.lampIntensity += (target.lampIntensity - current.lampIntensity) * alpha;
     current.rimIntensity += (target.rimIntensity - current.rimIntensity) * alpha;
-    current.emissive += (target.emissive - current.emissive) * alpha;
-    current.bloomStrength += (target.bloomStrength - current.bloomStrength) * alpha;
     current.background.lerp(target.background, alpha);
     current.fogColor.lerp(target.fogColor, alpha);
     current.fogDensity += (target.fogDensity - current.fogDensity) * alpha;
@@ -569,9 +529,6 @@ export function createScene(container: HTMLElement): SceneHandle {
     screenLightWide.color.copy(current.screenColor);
     lamp.intensity = current.lampIntensity;
     rim.intensity = current.rimIntensity;
-    screenMat.emissiveIntensity = current.emissive;
-    screenMat.emissive.copy(current.screenColor);
-    bloom.strength = current.bloomStrength;
     (scene.background as THREE.Color).copy(current.background);
     fog.color.copy(current.fogColor);
     fog.density = current.fogDensity;
@@ -580,9 +537,6 @@ export function createScene(container: HTMLElement): SceneHandle {
       (ray.material as THREE.MeshBasicMaterial).opacity =
         current.rayOpacity * (0.5 + 0.5 * Math.sin(t * 0.6));
     }
-
-    chat.cursorOn = Math.floor(t * 2) % 2 === 0;
-    chat.draw();
 
     camera.position.set(
       camBase.x + Math.sin(t * 0.35) * 0.06,
@@ -596,8 +550,11 @@ export function createScene(container: HTMLElement): SceneHandle {
   animate();
 
   function dispose() {
+    disposed = true;
     cancelAnimationFrame(rafId);
     window.removeEventListener('resize', onResize);
+    twitchChat?.disconnect();
+    draco.dispose();
     composer.dispose();
     renderer.dispose();
     envTex.dispose();
@@ -607,10 +564,5 @@ export function createScene(container: HTMLElement): SceneHandle {
     }
   }
 
-  return {
-    setMode,
-    addMessage: (user, text) => chat.addMessage(user, text),
-    setDraft: (text) => chat.setDraft(text),
-    dispose,
-  };
+  return { setMode, dispose };
 }

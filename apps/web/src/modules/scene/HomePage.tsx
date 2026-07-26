@@ -1,14 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createScene, type SceneHandle } from './createScene';
 
-const SEED_MESSAGES: Array<[string, string]> = [
-  ['fern_walker', "still can't believe this thing boots"],
-  ['byteoverbark', 'the moss on the vents is a whole ecosystem'],
-  ['pixel_moth', 'green screen glow hits different at night'],
-  ['old_growth_os', 'anyone know what year this rig is from'],
-  ['canopy_ctrl', 'respect for whoever left this running'],
-];
-
 export function HomePage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<SceneHandle | null>(null);
@@ -20,9 +12,6 @@ export function HomePage() {
 
     const handle = createScene(container);
     handleRef.current = handle;
-    for (const [user, text] of SEED_MESSAGES) {
-      handle.addMessage(user, text);
-    }
 
     return () => {
       handleRef.current = null;

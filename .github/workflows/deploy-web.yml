@@ -27,6 +27,7 @@ jobs:
       - run: npm run build -w apps/web
         env:
           VITE_HENRIK_API_KEY: ${{ secrets.HENRIK_API_KEY }}
+          VITE_TWITCH_CHANNEL: ${{ vars.TWITCH_CHANNEL }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: apps/web/dist
