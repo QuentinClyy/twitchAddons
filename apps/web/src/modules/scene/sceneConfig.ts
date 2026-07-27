@@ -93,12 +93,13 @@ export const DEFAULT_SCENE_CONFIG: SceneConfig = {
 
 /**
  * Runtime-tuned config takes priority over DEFAULT_SCENE_CONFIG when present: export from the
- * `?edit=1` editor and drop the downloaded file at `apps/web/public/sceneConfig.json` to override
- * the built-in defaults without a code change. Absent/invalid file silently falls back to defaults.
+ * `?edit=1` editor and drop the downloaded file at `apps/web/public/config/sceneConfig.json` to
+ * override the built-in defaults without a code change. Absent/invalid file silently falls back to
+ * defaults.
  */
 export async function loadRuntimeSceneConfig(baseUrl: string): Promise<SceneConfig | null> {
   try {
-    const res = await fetch(`${baseUrl}sceneConfig.json`);
+    const res = await fetch(`${baseUrl}config/sceneConfig.json`, { cache: 'no-store' });
     if (!res.ok) return null;
     return (await res.json()) as SceneConfig;
   } catch {

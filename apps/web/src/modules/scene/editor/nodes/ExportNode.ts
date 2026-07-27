@@ -1,11 +1,14 @@
 import { LGraphNode } from 'litegraph.js';
+import type * as THREE from 'three';
 import type { SceneEditAccess, LightingState } from '../../createScene';
 import type { SceneConfig, LightingConfigState, Vec3Tuple } from '../../sceneConfig';
 
-function colorToHex(color: { r: number; g: number; b: number }): string {
-  const toByte = (c: number) => Math.round(Math.max(0, Math.min(1, c)) * 255);
-  const hex = (n: number) => n.toString(16).padStart(2, '0');
-  return `#${hex(toByte(color.r))}${hex(toByte(color.g))}${hex(toByte(color.b))}`;
+// THREE.Color stores components in linear space internally; getHexString() converts back to
+// sRGB (matching how `new THREE.Color('#hex')`/`.set('#hex')` interpret hex strings elsewhere in
+// this codebase). A naive r/g/b*255 byte conversion here would skip that conversion and produce
+// a hex value that gets progressively wrong every export->reload->re-tune round trip.
+function colorToHex(color: THREE.Color): string {
+  return `#${color.getHexString()}`;
 }
 
 function toVec3Tuple(v: { x: number; y: number; z: number }): Vec3Tuple {
