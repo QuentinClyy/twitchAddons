@@ -105,10 +105,6 @@ export function mountEditor(handle: SceneHandle, container: HTMLElement): Editor
     rafId = requestAnimationFrame(tick);
     orbitControls.update();
 
-    // Bidirectional camera-marker sync: whichever marker is actively being dragged wins;
-    // otherwise the marker follows the (possibly graph-widget-edited) config value. This
-    // is independent of the live free-nav camera — OrbitControls owns camera.position
-    // while editing, the markers only feed the exportable camBase/camLookAt values.
     const draggingCamBase =
       transformControls.object === camBaseMarker && transformControls.dragging;
     const draggingCamLookAt =
