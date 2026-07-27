@@ -46,44 +46,6 @@
   box-sizing: border-box;
 }
 
-.chat-widget-root::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background: repeating-linear-gradient(
-    to bottom,
-    rgba(159, 201, 189, 0.05) 0px,
-    rgba(159, 201, 189, 0.05) 1px,
-    transparent 2px,
-    transparent 4px
-  );
-  animation: chat-widget-flicker 6s infinite;
-}
-
-@keyframes chat-widget-flicker {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  92% {
-    opacity: 1;
-  }
-  93% {
-    opacity: 0.85;
-  }
-  94% {
-    opacity: 1;
-  }
-  97% {
-    opacity: 0.9;
-  }
-  98% {
-    opacity: 1;
-  }
-}
-
 .chat-widget-root #log {
   position: relative;
   z-index: 1;

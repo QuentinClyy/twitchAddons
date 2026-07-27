@@ -16,7 +16,7 @@ export interface SceneHandle {
 }
 
 const MODEL_SCALE = 1;
-const MODEL_OFFSET = new THREE.Vector3(0, 0.97904, 0);
+const MODEL_OFFSET = new THREE.Vector3(0, 1.15, 0);
 const SCREEN_NODE_NAME = 'screen';
 const CHAT_CSS_WIDTH = 960;
 const CHAT_CSS_HEIGHT = 600;
@@ -79,7 +79,7 @@ function cloneState(state: LightingState): LightingState {
 
 export function createScene(container: HTMLElement, initialNight = false): SceneHandle {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(initialNight ? NIGHT_STATE.background : '#0a1410');
+  scene.background = new THREE.Color(initialNight ? NIGHT_STATE.background : DAY_STATE.background);
 
   const camera = new THREE.PerspectiveCamera(
     35,
@@ -87,7 +87,7 @@ export function createScene(container: HTMLElement, initialNight = false): Scene
     0.1,
     200,
   );
-  const camBase = new THREE.Vector3(3.6, 2.15, 7.1);
+  const camBase = new THREE.Vector3(2.6, 1.55, 5.1);
   camera.position.copy(camBase);
   camera.lookAt(0, 1.28, 0);
 
