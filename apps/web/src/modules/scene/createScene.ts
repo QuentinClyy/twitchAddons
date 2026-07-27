@@ -7,8 +7,6 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { CSS3DObject, CSS3DRenderer } from 'three/addons/renderers/CSS3DRenderer.js';
 import { config } from '../../config/env';
-import { ChatPanel } from './chatPanel';
-import { connectTwitchChat, type TwitchChatHandle } from './twitchChat';
 
 export interface SceneHandle {
   setMode(isNight: boolean): void;
@@ -147,23 +145,12 @@ export function createScene(container: HTMLElement, initialNight = false): Scene
   monitor.position.set(0, 0, 0.4);
   scene.add(monitor);
 
-  const chat = new ChatPanel();
-
-  let twitchChat: TwitchChatHandle | null = null;
-  if (config.twitchChannel) {
-    twitchChat = connectTwitchChat(config.twitchChannel, {
-      onMessage: (message) =>
-        chat.addMessage(
-          message.id,
-          message.from,
-          message.messageHtml,
-          message.color,
-          message.badges,
-        ),
-      onDeleteMessage: (messageId) => chat.deleteMessage(messageId),
-      onClearUser: (username) => chat.clearUser(username),
-      onClearAll: () => chat.clearAll(),
-    });
+  let chatElement: HTMLIFrameElement | null = null;
+  if (config.streamlabsWidgetUrl) {
+    chatElement = document.createElement('iframe');
+    chatElement.src = config.streamlabsWidgetUrl;
+    chatElement.referrerPolicy = 'no-referrer';
+    chatElement.style.border = 'none';
   }
 
   const draco = new DRACOLoader();
@@ -196,12 +183,14 @@ export function createScene(container: HTMLElement, initialNight = false): Scene
       const centerY = (bbox.min.y + bbox.max.y) / 2;
       const centerZ = bbox.max.z;
 
-      chat.element.style.width = `${CHAT_CSS_WIDTH}px`;
-      chat.element.style.height = `${CHAT_CSS_HEIGHT}px`;
-      const chatObject = new CSS3DObject(chat.element);
-      chatObject.position.set(centerX, centerY, centerZ);
-      chatObject.scale.set(worldWidth / CHAT_CSS_WIDTH, worldHeight / CHAT_CSS_HEIGHT, 1);
-      screenMesh.add(chatObject);
+      if (chatElement) {
+        chatElement.style.width = `${CHAT_CSS_WIDTH}px`;
+        chatElement.style.height = `${CHAT_CSS_HEIGHT}px`;
+        const chatObject = new CSS3DObject(chatElement);
+        chatObject.position.set(centerX, centerY, centerZ);
+        chatObject.scale.set(worldWidth / CHAT_CSS_WIDTH, worldHeight / CHAT_CSS_HEIGHT, 1);
+        screenMesh.add(chatObject);
+      }
     }
 
     monitor.add(gltf.scene);
@@ -275,7 +264,6 @@ export function createScene(container: HTMLElement, initialNight = false): Scene
     disposed = true;
     cancelAnimationFrame(rafId);
     window.removeEventListener('resize', onResize);
-    twitchChat?.disconnect();
     draco.dispose();
     composer.dispose();
     renderer.dispose();

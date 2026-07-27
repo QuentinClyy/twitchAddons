@@ -1,4 +1,4 @@
 export const config = {
   henrikApiKey: import.meta.env.VITE_HENRIK_API_KEY,
-  twitchChannel: import.meta.env.VITE_TWITCH_CHANNEL ?? '',
+  streamlabsWidgetUrl: import.meta.env.VITE_STREAMLABS_WIDGET_URL ?? '',
 };

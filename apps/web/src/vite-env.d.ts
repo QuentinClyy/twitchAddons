@@ -2,7 +2,7 @@
 
 interface ImportMetaEnv {
   readonly VITE_HENRIK_API_KEY?: string;
-  readonly VITE_TWITCH_CHANNEL?: string;
+  readonly VITE_STREAMLABS_WIDGET_URL?: string;
 }
 
 interface ImportMeta {
