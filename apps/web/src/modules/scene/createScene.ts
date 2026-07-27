@@ -7,19 +7,9 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { CSS3DObject, CSS3DRenderer } from 'three/addons/renderers/CSS3DRenderer.js';
 import { config } from '../../config/env';
+import { DEFAULT_SCENE_CONFIG, type LightingConfigState, type Vec3Tuple } from './sceneConfig';
 
-export interface SceneHandle {
-  setMode(isNight: boolean): void;
-  dispose(): void;
-}
-
-const MODEL_SCALE = 1;
-const MODEL_OFFSET = new THREE.Vector3(0, 1.15, 0);
-const SCREEN_NODE_NAME = 'screen';
-const CHAT_CSS_WIDTH = 960;
-const CHAT_CSS_HEIGHT = 600;
-
-interface LightingState {
+export interface LightingState {
   hemiIntensity: number;
   hemiSky: THREE.Color;
   hemiGround: THREE.Color;
@@ -34,35 +24,56 @@ interface LightingState {
   exposure: number;
 }
 
-const DAY_STATE: LightingState = {
-  hemiIntensity: 0.42,
-  hemiSky: new THREE.Color('#bcd8ff'),
-  hemiGround: new THREE.Color('#1c2a1a'),
-  sunIntensity: 1.2,
-  sunColor: new THREE.Color('#fff2d6'),
-  fillIntensity: 0.16,
-  fillColor: new THREE.Color('#4a6a4a'),
-  lampIntensity: 0.1,
-  rimIntensity: 0.25,
-  background: new THREE.Color('#42533f'),
-  envIntensity: 0.4,
-  exposure: 1.0,
-};
+export interface SceneEditAccess {
+  camera: THREE.PerspectiveCamera;
+  renderer: THREE.WebGLRenderer;
+  scene: THREE.Scene;
+  monitor: THREE.Group;
+  lights: {
+    hemi: THREE.HemisphereLight;
+    sun: THREE.DirectionalLight;
+    fill: THREE.AmbientLight;
+    lamp: THREE.PointLight;
+    rim: THREE.DirectionalLight;
+  };
+  dayState: LightingState;
+  nightState: LightingState;
+  camBase: THREE.Vector3;
+  camLookAt: THREE.Vector3;
+  setPreviewMode(isNight: boolean): void;
+  setIdleAnimationEnabled(enabled: boolean): void;
+}
 
-const NIGHT_STATE: LightingState = {
-  hemiIntensity: 0.05,
-  hemiSky: new THREE.Color('#1a2440'),
-  hemiGround: new THREE.Color('#050805'),
-  sunIntensity: 0.0,
-  sunColor: new THREE.Color('#8899ff'),
-  fillIntensity: 0.06,
-  fillColor: new THREE.Color('#3a2a18'),
-  lampIntensity: 0.3,
-  rimIntensity: 0.08,
-  background: new THREE.Color('#020402'),
-  envIntensity: 0.15,
-  exposure: 0.95,
-};
+export interface SceneHandle {
+  setMode(isNight: boolean): void;
+  dispose(): void;
+  edit: SceneEditAccess;
+}
+
+const SCREEN_NODE_NAME = 'screen';
+const CHAT_CSS_WIDTH = 960;
+const CHAT_CSS_HEIGHT = 600;
+
+function toVector3(v: Vec3Tuple): THREE.Vector3 {
+  return new THREE.Vector3(v.x, v.y, v.z);
+}
+
+function toLightingState(state: LightingConfigState): LightingState {
+  return {
+    hemiIntensity: state.hemiIntensity,
+    hemiSky: new THREE.Color(state.hemiSky),
+    hemiGround: new THREE.Color(state.hemiGround),
+    sunIntensity: state.sunIntensity,
+    sunColor: new THREE.Color(state.sunColor),
+    fillIntensity: state.fillIntensity,
+    fillColor: new THREE.Color(state.fillColor),
+    lampIntensity: state.lampIntensity,
+    rimIntensity: state.rimIntensity,
+    background: new THREE.Color(state.background),
+    envIntensity: state.envIntensity,
+    exposure: state.exposure,
+  };
+}
 
 function cloneState(state: LightingState): LightingState {
   return {
@@ -75,19 +86,41 @@ function cloneState(state: LightingState): LightingState {
   };
 }
 
+function copyState(target: LightingState, source: LightingState) {
+  target.hemiIntensity = source.hemiIntensity;
+  target.hemiSky.copy(source.hemiSky);
+  target.hemiGround.copy(source.hemiGround);
+  target.sunIntensity = source.sunIntensity;
+  target.sunColor.copy(source.sunColor);
+  target.fillIntensity = source.fillIntensity;
+  target.fillColor.copy(source.fillColor);
+  target.lampIntensity = source.lampIntensity;
+  target.rimIntensity = source.rimIntensity;
+  target.background.copy(source.background);
+  target.envIntensity = source.envIntensity;
+  target.exposure = source.exposure;
+}
+
 export function createScene(container: HTMLElement, initialNight = false): SceneHandle {
+  const sceneConfig = DEFAULT_SCENE_CONFIG;
+  const DAY_STATE = toLightingState(sceneConfig.day);
+  const NIGHT_STATE = toLightingState(sceneConfig.night);
+  const MODEL_SCALE = sceneConfig.model.scale;
+  const MODEL_OFFSET = toVector3(sceneConfig.model.position);
+
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(initialNight ? NIGHT_STATE.background : DAY_STATE.background);
 
   const camera = new THREE.PerspectiveCamera(
-    35,
+    sceneConfig.camera.fov,
     container.clientWidth / container.clientHeight,
     0.1,
     200,
   );
-  const camBase = new THREE.Vector3(2.6, 1.55, 5.1);
+  const camBase = toVector3(sceneConfig.camera.base);
+  const camLookAt = toVector3(sceneConfig.camera.lookAt);
   camera.position.copy(camBase);
-  camera.lookAt(0, 1.28, 0);
+  camera.lookAt(camLookAt);
 
   const renderer = new THREE.WebGLRenderer({
     antialias: true,
@@ -122,7 +155,7 @@ export function createScene(container: HTMLElement, initialNight = false): Scene
   const hemi = new THREE.HemisphereLight('#bcd8ff', '#1c2a1a', 0.7);
   scene.add(hemi);
   const sun = new THREE.DirectionalLight('#fff2d6', 1.15);
-  sun.position.set(-6, 9, 3);
+  sun.position.copy(toVector3(sceneConfig.lightPositions.sun));
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.camera.left = -10;
@@ -135,14 +168,15 @@ export function createScene(container: HTMLElement, initialNight = false): Scene
   const fill = new THREE.AmbientLight('#4a6a4a', 0.22);
   scene.add(fill);
   const lamp = new THREE.PointLight('#ffb168', 0.25, 5, 2);
-  lamp.position.set(-2.1, 1.6, 1.4);
+  lamp.position.copy(toVector3(sceneConfig.lightPositions.lamp));
   scene.add(lamp);
   const rim = new THREE.DirectionalLight('#8fd8c8', 0.3);
-  rim.position.set(2, 3, -6);
+  rim.position.copy(toVector3(sceneConfig.lightPositions.rim));
   scene.add(rim);
 
   const monitor = new THREE.Group();
-  monitor.position.set(0, 0, 0.4);
+  monitor.position.copy(MODEL_OFFSET);
+  monitor.scale.setScalar(MODEL_SCALE);
   scene.add(monitor);
 
   let chatElement: HTMLIFrameElement | null = null;
@@ -158,10 +192,8 @@ export function createScene(container: HTMLElement, initialNight = false): Scene
   const gltfLoader = new GLTFLoader();
   gltfLoader.setDRACOLoader(draco);
   let disposed = false;
-  gltfLoader.load(`${import.meta.env.BASE_URL}models/new-cassette-system.glb`, (gltf) => {
+  gltfLoader.load(`${import.meta.env.BASE_URL}models/new-cassette-system.gltf`, (gltf) => {
     if (disposed) return;
-    gltf.scene.position.copy(MODEL_OFFSET);
-    gltf.scene.scale.setScalar(MODEL_SCALE);
     gltf.scene.traverse((obj) => {
       if ((obj as THREE.Mesh).isMesh) {
         obj.castShadow = true;
@@ -209,9 +241,19 @@ export function createScene(container: HTMLElement, initialNight = false): Scene
 
   let target = initialNight ? NIGHT_STATE : DAY_STATE;
   const current = cloneState(target);
+  let idleAnimationEnabled = true;
 
   function setMode(isNight: boolean) {
     target = isNight ? NIGHT_STATE : DAY_STATE;
+  }
+
+  function setPreviewMode(isNight: boolean) {
+    target = isNight ? NIGHT_STATE : DAY_STATE;
+    copyState(current, target);
+  }
+
+  function setIdleAnimationEnabled(enabled: boolean) {
+    idleAnimationEnabled = enabled;
   }
 
   const clock = new THREE.Clock();
@@ -248,12 +290,14 @@ export function createScene(container: HTMLElement, initialNight = false): Scene
     (scene.background as THREE.Color).copy(current.background);
     renderer.toneMappingExposure = current.exposure;
 
-    camera.position.set(
-      camBase.x + Math.sin(t * 0.35) * 0.06,
-      camBase.y + Math.sin(t * 0.5) * 0.035,
-      camBase.z + Math.cos(t * 0.3) * 0.05,
-    );
-    camera.lookAt(0, 1.3, 0);
+    if (idleAnimationEnabled) {
+      camera.position.set(
+        camBase.x + Math.sin(t * 0.35) * 0.06,
+        camBase.y + Math.sin(t * 0.5) * 0.035,
+        camBase.z + Math.cos(t * 0.3) * 0.05,
+      );
+      camera.lookAt(camLookAt);
+    }
 
     composer.render();
     cssRenderer.render(scene, camera);
@@ -277,5 +321,19 @@ export function createScene(container: HTMLElement, initialNight = false): Scene
     }
   }
 
-  return { setMode, dispose };
+  const edit: SceneEditAccess = {
+    camera,
+    renderer,
+    scene,
+    monitor,
+    lights: { hemi, sun, fill, lamp, rim },
+    dayState: DAY_STATE,
+    nightState: NIGHT_STATE,
+    camBase,
+    camLookAt,
+    setPreviewMode,
+    setIdleAnimationEnabled,
+  };
+
+  return { setMode, dispose, edit };
 }
