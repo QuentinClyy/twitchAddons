@@ -36,7 +36,7 @@ export class ModelTransformNode extends LGraphNode {
       monitor.scale.setScalar(v);
     });
 
-    this.size = [220, 220];
+    this.size = [220, 230];
   }
 
   syncFromLive() {

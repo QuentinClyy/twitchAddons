@@ -25,7 +25,7 @@ export function mountEditor(handle: SceneHandle, container: HTMLElement): Editor
   edit.setIdleAnimationEnabled(false);
 
   const editorState: EditorState = { previewMode: 'night' };
-  const sceneGraph = createSceneGraph(edit, editorState, container.clientHeight);
+  const sceneGraph = createSceneGraph(edit, editorState, container.clientWidth);
   sceneGraph.canvasElement.style.zIndex = '20';
   container.appendChild(sceneGraph.canvasElement);
 

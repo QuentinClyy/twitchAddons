@@ -37,7 +37,7 @@ export class CameraNode extends LGraphNode {
       camera.updateProjectionMatrix();
     });
 
-    this.size = [220, 220];
+    this.size = [220, 230];
   }
 
   syncFromLive() {

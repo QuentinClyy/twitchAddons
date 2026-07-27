@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "day": {
+    "hemiIntensity": 0.42,
+    "hemiSky": "#80afff",
+    "hemiGround": "#030603",
+    "sunIntensity": 1.2,
+    "sunColor": "#ffe2ab",
+    "fillIntensity": 0.16,
+    "fillColor": "#112511",
+    "lampIntensity": 0.1,
+    "rimIntensity": 0.25,
+    "background": "#0e160d",
+    "envIntensity": 0.4,
+    "exposure": 1
+  },
+  "night": {
+    "hemiIntensity": 1.7157799971731091,
+    "hemiSky": "#03040d",
+    "hemiGround": "#002000",
+    "sunIntensity": 0,
+    "sunColor": "#3f51ff",
+    "fillIntensity": 1.1947305779708108,
+    "fillColor": "#1e685f",
+    "lampIntensity": 1.7420989990234412,
+    "rimIntensity": 2.521046367444491,
+    "background": "#000000",
+    "envIntensity": 0.15,
+    "exposure": 0.95
+  },
+  "lightPositions": {
+    "sun": {
+      "x": -6,
+      "y": 9,
+      "z": 3
+    },
+    "lamp": {
+      "x": -2.1,
+      "y": 1.6,
+      "z": 1.4
+    },
+    "rim": {
+      "x": 2,
+      "y": 3,
+      "z": -6
+    }
+  },
+  "camera": {
+    "base": {
+      "x": 2.6,
+      "y": 1.55,
+      "z": 5.1
+    },
+    "lookAt": {
+      "x": 0,
+      "y": 1.3,
+      "z": 0
+    },
+    "fov": 35
+  },
+  "model": {
+    "position": {
+      "x": 0,
+      "y": 1.15,
+      "z": 0.4
+    },
+    "scale": 1
+  }
+}

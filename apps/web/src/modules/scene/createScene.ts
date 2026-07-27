@@ -7,7 +7,12 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { CSS3DObject, CSS3DRenderer } from 'three/addons/renderers/CSS3DRenderer.js';
 import { config } from '../../config/env';
-import { DEFAULT_SCENE_CONFIG, type LightingConfigState, type Vec3Tuple } from './sceneConfig';
+import {
+  DEFAULT_SCENE_CONFIG,
+  loadRuntimeSceneConfig,
+  type LightingConfigState,
+  type Vec3Tuple,
+} from './sceneConfig';
 
 export interface LightingState {
   hemiIntensity: number;
@@ -18,7 +23,9 @@ export interface LightingState {
   fillIntensity: number;
   fillColor: THREE.Color;
   lampIntensity: number;
+  lampColor: THREE.Color;
   rimIntensity: number;
+  rimColor: THREE.Color;
   background: THREE.Color;
   envIntensity: number;
   exposure: number;
@@ -58,21 +65,42 @@ function toVector3(v: Vec3Tuple): THREE.Vector3 {
   return new THREE.Vector3(v.x, v.y, v.z);
 }
 
-function toLightingState(state: LightingConfigState): LightingState {
-  return {
-    hemiIntensity: state.hemiIntensity,
-    hemiSky: new THREE.Color(state.hemiSky),
-    hemiGround: new THREE.Color(state.hemiGround),
-    sunIntensity: state.sunIntensity,
-    sunColor: new THREE.Color(state.sunColor),
-    fillIntensity: state.fillIntensity,
-    fillColor: new THREE.Color(state.fillColor),
-    lampIntensity: state.lampIntensity,
-    rimIntensity: state.rimIntensity,
-    background: new THREE.Color(state.background),
-    envIntensity: state.envIntensity,
-    exposure: state.exposure,
+function applyLightingConfig(state: LightingState, config: LightingConfigState) {
+  state.hemiIntensity = config.hemiIntensity;
+  state.hemiSky.set(config.hemiSky);
+  state.hemiGround.set(config.hemiGround);
+  state.sunIntensity = config.sunIntensity;
+  state.sunColor.set(config.sunColor);
+  state.fillIntensity = config.fillIntensity;
+  state.fillColor.set(config.fillColor);
+  state.lampIntensity = config.lampIntensity;
+  state.lampColor.set(config.lampColor);
+  state.rimIntensity = config.rimIntensity;
+  state.rimColor.set(config.rimColor);
+  state.background.set(config.background);
+  state.envIntensity = config.envIntensity;
+  state.exposure = config.exposure;
+}
+
+function toLightingState(config: LightingConfigState): LightingState {
+  const state: LightingState = {
+    hemiIntensity: 0,
+    hemiSky: new THREE.Color(),
+    hemiGround: new THREE.Color(),
+    sunIntensity: 0,
+    sunColor: new THREE.Color(),
+    fillIntensity: 0,
+    fillColor: new THREE.Color(),
+    lampIntensity: 0,
+    lampColor: new THREE.Color(),
+    rimIntensity: 0,
+    rimColor: new THREE.Color(),
+    background: new THREE.Color(),
+    envIntensity: 0,
+    exposure: 1,
   };
+  applyLightingConfig(state, config);
+  return state;
 }
 
 function cloneState(state: LightingState): LightingState {
@@ -82,6 +110,8 @@ function cloneState(state: LightingState): LightingState {
     hemiGround: state.hemiGround.clone(),
     sunColor: state.sunColor.clone(),
     fillColor: state.fillColor.clone(),
+    lampColor: state.lampColor.clone(),
+    rimColor: state.rimColor.clone(),
     background: state.background.clone(),
   };
 }
@@ -95,7 +125,9 @@ function copyState(target: LightingState, source: LightingState) {
   target.fillIntensity = source.fillIntensity;
   target.fillColor.copy(source.fillColor);
   target.lampIntensity = source.lampIntensity;
+  target.lampColor.copy(source.lampColor);
   target.rimIntensity = source.rimIntensity;
+  target.rimColor.copy(source.rimColor);
   target.background.copy(source.background);
   target.envIntensity = source.envIntensity;
   target.exposure = source.exposure;
@@ -192,12 +224,18 @@ export function createScene(container: HTMLElement, initialNight = false): Scene
   const gltfLoader = new GLTFLoader();
   gltfLoader.setDRACOLoader(draco);
   let disposed = false;
+  const envMappedMaterials: THREE.MeshStandardMaterial[] = [];
   gltfLoader.load(`${import.meta.env.BASE_URL}models/new-cassette-system.gltf`, (gltf) => {
     if (disposed) return;
     gltf.scene.traverse((obj) => {
       if ((obj as THREE.Mesh).isMesh) {
         obj.castShadow = true;
         obj.receiveShadow = true;
+        const mesh = obj as THREE.Mesh;
+        const material = mesh.material as THREE.MeshStandardMaterial;
+        if (material && 'envMapIntensity' in material) {
+          envMappedMaterials.push(material);
+        }
       }
     });
 
@@ -256,6 +294,22 @@ export function createScene(container: HTMLElement, initialNight = false): Scene
     idleAnimationEnabled = enabled;
   }
 
+  loadRuntimeSceneConfig(import.meta.env.BASE_URL).then((runtimeConfig) => {
+    if (!runtimeConfig || disposed) return;
+    applyLightingConfig(DAY_STATE, runtimeConfig.day);
+    applyLightingConfig(NIGHT_STATE, runtimeConfig.night);
+    sun.position.copy(toVector3(runtimeConfig.lightPositions.sun));
+    lamp.position.copy(toVector3(runtimeConfig.lightPositions.lamp));
+    rim.position.copy(toVector3(runtimeConfig.lightPositions.rim));
+    camBase.copy(toVector3(runtimeConfig.camera.base));
+    camLookAt.copy(toVector3(runtimeConfig.camera.lookAt));
+    camera.fov = runtimeConfig.camera.fov;
+    camera.updateProjectionMatrix();
+    monitor.position.copy(toVector3(runtimeConfig.model.position));
+    monitor.scale.setScalar(runtimeConfig.model.scale);
+    copyState(current, target);
+  });
+
   const clock = new THREE.Clock();
   let rafId = 0;
 
@@ -273,7 +327,9 @@ export function createScene(container: HTMLElement, initialNight = false): Scene
     current.fillIntensity += (target.fillIntensity - current.fillIntensity) * alpha;
     current.fillColor.lerp(target.fillColor, alpha);
     current.lampIntensity += (target.lampIntensity - current.lampIntensity) * alpha;
+    current.lampColor.lerp(target.lampColor, alpha);
     current.rimIntensity += (target.rimIntensity - current.rimIntensity) * alpha;
+    current.rimColor.lerp(target.rimColor, alpha);
     current.background.lerp(target.background, alpha);
     current.envIntensity += (target.envIntensity - current.envIntensity) * alpha;
     current.exposure += (target.exposure - current.exposure) * alpha;
@@ -286,9 +342,14 @@ export function createScene(container: HTMLElement, initialNight = false): Scene
     fill.intensity = current.fillIntensity;
     fill.color.copy(current.fillColor);
     lamp.intensity = current.lampIntensity;
+    lamp.color.copy(current.lampColor);
     rim.intensity = current.rimIntensity;
+    rim.color.copy(current.rimColor);
     (scene.background as THREE.Color).copy(current.background);
     renderer.toneMappingExposure = current.exposure;
+    for (const material of envMappedMaterials) {
+      material.envMapIntensity = current.envIntensity;
+    }
 
     if (idleAnimationEnabled) {
       camera.position.set(

@@ -13,7 +13,9 @@ export interface LightingConfigState {
   fillIntensity: number;
   fillColor: string;
   lampIntensity: number;
+  lampColor: string;
   rimIntensity: number;
+  rimColor: string;
   background: string;
   envIntensity: number;
   exposure: number;
@@ -50,7 +52,9 @@ export const DEFAULT_SCENE_CONFIG: SceneConfig = {
     fillIntensity: 0.16,
     fillColor: '#4a6a4a',
     lampIntensity: 0.1,
+    lampColor: '#ffb168',
     rimIntensity: 0.25,
+    rimColor: '#8fd8c8',
     background: '#42533f',
     envIntensity: 0.4,
     exposure: 1.0,
@@ -64,7 +68,9 @@ export const DEFAULT_SCENE_CONFIG: SceneConfig = {
     fillIntensity: 0.06,
     fillColor: '#3a2a18',
     lampIntensity: 0.3,
+    lampColor: '#ffb168',
     rimIntensity: 0.08,
+    rimColor: '#8fd8c8',
     background: '#020402',
     envIntensity: 0.15,
     exposure: 0.95,
@@ -84,3 +90,18 @@ export const DEFAULT_SCENE_CONFIG: SceneConfig = {
     scale: 1,
   },
 };
+
+/**
+ * Runtime-tuned config takes priority over DEFAULT_SCENE_CONFIG when present: export from the
+ * `?edit=1` editor and drop the downloaded file at `apps/web/public/sceneConfig.json` to override
+ * the built-in defaults without a code change. Absent/invalid file silently falls back to defaults.
+ */
+export async function loadRuntimeSceneConfig(baseUrl: string): Promise<SceneConfig | null> {
+  try {
+    const res = await fetch(`${baseUrl}sceneConfig.json`);
+    if (!res.ok) return null;
+    return (await res.json()) as SceneConfig;
+  } catch {
+    return null;
+  }
+}

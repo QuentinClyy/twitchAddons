@@ -72,7 +72,7 @@ export class HemiLightNode extends LGraphNode {
       (v: number) => {
         activeState(edit, editorState).hemiIntensity = v;
       },
-      { min: 0, max: 2 },
+      { min: 0, max: 10 },
     );
     this.skyWidgets = addColorWidgets(this, 'sky', () => activeState(edit, editorState).hemiSky);
     this.groundWidgets = addColorWidgets(
@@ -80,7 +80,7 @@ export class HemiLightNode extends LGraphNode {
       'ground',
       () => activeState(edit, editorState).hemiGround,
     );
-    this.size = [220, 140];
+    this.size = [220, 230];
   }
 
   syncFromLive() {
@@ -113,7 +113,7 @@ export class SunLightNode extends LGraphNode {
       (v: number) => {
         activeState(edit, editorState).sunIntensity = v;
       },
-      { min: 0, max: 2 },
+      { min: 0, max: 10 },
     );
     this.colorWidgets = addColorWidgets(
       this,
@@ -121,7 +121,7 @@ export class SunLightNode extends LGraphNode {
       () => activeState(edit, editorState).sunColor,
     );
     this.posWidgets = addPositionWidgets(this, edit.lights.sun);
-    this.size = [220, 160];
+    this.size = [220, 230];
   }
 
   syncFromLive() {
@@ -153,14 +153,14 @@ export class FillLightNode extends LGraphNode {
       (v: number) => {
         activeState(edit, editorState).fillIntensity = v;
       },
-      { min: 0, max: 2 },
+      { min: 0, max: 10 },
     );
     this.colorWidgets = addColorWidgets(
       this,
       'color',
       () => activeState(edit, editorState).fillColor,
     );
-    this.size = [220, 120];
+    this.size = [220, 150];
   }
 
   syncFromLive() {
@@ -175,6 +175,7 @@ export class FillLightNode extends LGraphNode {
 
 export class LampLightNode extends LGraphNode {
   private intensityWidget: { value: number };
+  private colorWidgets: ReturnType<typeof addColorWidgets>;
   private posWidgets: ReturnType<typeof addPositionWidgets>;
 
   constructor(
@@ -189,14 +190,23 @@ export class LampLightNode extends LGraphNode {
       (v: number) => {
         activeState(edit, editorState).lampIntensity = v;
       },
-      { min: 0, max: 2 },
+      { min: 0, max: 10 },
+    );
+    this.colorWidgets = addColorWidgets(
+      this,
+      'color',
+      () => activeState(edit, editorState).lampColor,
     );
     this.posWidgets = addPositionWidgets(this, edit.lights.lamp);
-    this.size = [220, 140];
+    this.size = [220, 230];
   }
 
   syncFromLive() {
-    this.intensityWidget.value = activeState(this.edit, this.editorState).lampIntensity;
+    const state = activeState(this.edit, this.editorState);
+    this.intensityWidget.value = state.lampIntensity;
+    this.colorWidgets.r.value = state.lampColor.r;
+    this.colorWidgets.g.value = state.lampColor.g;
+    this.colorWidgets.b.value = state.lampColor.b;
     this.posWidgets.x.value = this.edit.lights.lamp.position.x;
     this.posWidgets.y.value = this.edit.lights.lamp.position.y;
     this.posWidgets.z.value = this.edit.lights.lamp.position.z;
@@ -206,6 +216,7 @@ export class LampLightNode extends LGraphNode {
 
 export class RimLightNode extends LGraphNode {
   private intensityWidget: { value: number };
+  private colorWidgets: ReturnType<typeof addColorWidgets>;
   private posWidgets: ReturnType<typeof addPositionWidgets>;
 
   constructor(
@@ -220,14 +231,23 @@ export class RimLightNode extends LGraphNode {
       (v: number) => {
         activeState(edit, editorState).rimIntensity = v;
       },
-      { min: 0, max: 2 },
+      { min: 0, max: 10 },
+    );
+    this.colorWidgets = addColorWidgets(
+      this,
+      'color',
+      () => activeState(edit, editorState).rimColor,
     );
     this.posWidgets = addPositionWidgets(this, edit.lights.rim);
-    this.size = [220, 140];
+    this.size = [220, 230];
   }
 
   syncFromLive() {
-    this.intensityWidget.value = activeState(this.edit, this.editorState).rimIntensity;
+    const state = activeState(this.edit, this.editorState);
+    this.intensityWidget.value = state.rimIntensity;
+    this.colorWidgets.r.value = state.rimColor.r;
+    this.colorWidgets.g.value = state.rimColor.g;
+    this.colorWidgets.b.value = state.rimColor.b;
     this.posWidgets.x.value = this.edit.lights.rim.position.x;
     this.posWidgets.y.value = this.edit.lights.rim.position.y;
     this.posWidgets.z.value = this.edit.lights.rim.position.z;

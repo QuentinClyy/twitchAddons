@@ -12,6 +12,7 @@ import { ModelTransformNode } from './nodes/ModelTransformNode';
 import { CameraNode } from './nodes/CameraNode';
 import { SceneModeNode } from './nodes/SceneModeNode';
 import { ExportNode } from './nodes/ExportNode';
+import { EnvironmentNode } from './nodes/EnvironmentNode';
 
 export interface SceneGraphHandle {
   canvasElement: HTMLCanvasElement;
@@ -27,19 +28,19 @@ interface SyncableNode extends LGraphNode {
 export function createSceneGraph(
   edit: SceneEditAccess,
   editorState: EditorState,
-  panelHeight: number,
+  panelWidth: number,
 ): SceneGraphHandle {
   const graph = new LGraph();
 
+  const height = 260;
   const canvasEl = document.createElement('canvas');
-  const width = 300;
-  canvasEl.width = width;
-  canvasEl.height = panelHeight;
+  canvasEl.width = panelWidth;
+  canvasEl.height = height;
   canvasEl.style.position = 'absolute';
-  canvasEl.style.top = '0';
+  canvasEl.style.bottom = '0';
   canvasEl.style.left = '0';
-  canvasEl.style.width = `${width}px`;
-  canvasEl.style.height = `${panelHeight}px`;
+  canvasEl.style.width = `${panelWidth}px`;
+  canvasEl.style.height = `${height}px`;
   canvasEl.style.background = 'rgba(10,14,12,0.85)';
 
   const lgCanvas = new LGraphCanvas(canvasEl, graph);
@@ -51,17 +52,18 @@ export function createSceneGraph(
     new FillLightNode(edit, editorState),
     new LampLightNode(edit, editorState),
     new RimLightNode(edit, editorState),
+    new EnvironmentNode(edit, editorState),
     new ModelTransformNode(edit),
     new CameraNode(edit),
     new SceneModeNode(edit, editorState),
     new ExportNode(edit),
   ];
 
-  let y = 10;
+  let x = 10;
   for (const node of nodes) {
-    node.pos = [10, y];
+    node.pos = [x, 10];
     graph.add(node);
-    y += node.size[1] + 16;
+    x += node.size[0] + 16;
   }
 
   lgCanvas.startRendering();
