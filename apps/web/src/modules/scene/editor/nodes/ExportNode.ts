@@ -3,10 +3,6 @@ import type * as THREE from 'three';
 import type { SceneEditAccess, LightingState } from '../../createScene';
 import type { SceneConfig, LightingConfigState, Vec3Tuple } from '../../sceneConfig';
 
-// THREE.Color stores components in linear space internally; getHexString() converts back to
-// sRGB (matching how `new THREE.Color('#hex')`/`.set('#hex')` interpret hex strings elsewhere in
-// this codebase). A naive r/g/b*255 byte conversion here would skip that conversion and produce
-// a hex value that gets progressively wrong every export->reload->re-tune round trip.
 function colorToHex(color: THREE.Color): string {
   return `#${color.getHexString()}`;
 }
