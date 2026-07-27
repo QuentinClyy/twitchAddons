@@ -8,9 +8,14 @@
   "scripts": {
     "lint": "npm run lint --workspaces --if-present",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "model:build": "node tools/model-pipeline/build.mjs"
   },
   "devDependencies": {
+    "@gltf-transform/cli": "^4.4.2",
+    "@gltf-transform/core": "^4.4.2",
+    "@gltf-transform/extensions": "^4.4.2",
+    "draco3dgltf": "^1.5.7",
     "prettier": "^3.0.0"
   }
 }

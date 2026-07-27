@@ -1,1 +1,0 @@
-{"root":["./src/vite-env.d.ts","./src/common/http.ts","./src/common/queryParams.ts","./src/config/env.ts","./src/modules/valorant/BadgePage.tsx","./src/modules/valorant/api.ts","./src/modules/valorant/rankAssets.ts","./src/modules/valorant/types.ts","./src/pages/valorant-badge/main.tsx"],"version":"5.9.3"}
